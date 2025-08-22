@@ -1,10 +1,11 @@
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 
 app = FastAPI(title="Options P&L API", version="1.0.0")
 
+# Allow frontend to call API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,7 +20,7 @@ class PnLRequest(BaseModel):
     current_price: Optional[float] = None
     percent_increase: Optional[float] = None
 
-    @root_validator
+    @model_validator(mode="after")
     def validate_one_of(cls, values):
         cp, pct = values.get("current_price"), values.get("percent_increase")
         if cp is None and pct is None:
@@ -44,10 +45,11 @@ class PnLResponse(BaseModel):
 
 @app.post("/pnl", response_model=PnLResponse)
 def compute_pnl(req: PnLRequest):
+    # Determine current price
     if req.current_price is not None:
         current_price = req.current_price
     else:
-        current_price = req.buy_price * (1 + (req.percent_increase / 100.0))
+        current_price = req.buy_price * (1 + req.percent_increase / 100)
         if current_price <= 0:
             raise HTTPException(status_code=400, detail="Invalid percent increase")
 
@@ -58,8 +60,14 @@ def compute_pnl(req: PnLRequest):
     for sold in range(1, req.units + 1):
         revenue = sold * current_price
         pnl = revenue - total_cost
-        rows.append(PnLRow(sold=sold, revenue=round(revenue, 2),
-                           total_cost=round(total_cost, 2), pnl=round(pnl, 2)))
+        rows.append(
+            PnLRow(
+                sold=sold,
+                revenue=round(revenue, 2),
+                total_cost=round(total_cost, 2),
+                pnl=round(pnl, 2),
+            )
+        )
         if break_even_unit is None and pnl >= 0:
             break_even_unit = sold
 
@@ -71,3 +79,4 @@ def compute_pnl(req: PnLRequest):
         break_even_unit=break_even_unit,
         rows=rows,
     )
+
