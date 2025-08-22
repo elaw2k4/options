@@ -14,6 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------- Root endpoint ----------
+@app.get("/")
+def read_root():
+    return {"message": "Options Profit & Loss API is running", "version": "1.0.0"}
+
+
 class PnLRequest(BaseModel):
     units: int = Field(..., gt=0)
     buy_price: float = Field(..., gt=0)
@@ -29,11 +35,13 @@ class PnLRequest(BaseModel):
             raise ValueError("Provide only one of current_price or percent_increase")
         return values
 
+
 class PnLRow(BaseModel):
     sold: int
     revenue: float
     total_cost: float
     pnl: float
+
 
 class PnLResponse(BaseModel):
     units: int
@@ -42,6 +50,7 @@ class PnLResponse(BaseModel):
     total_cost: float
     break_even_unit: Optional[int]
     rows: List[PnLRow]
+
 
 @app.post("/pnl", response_model=PnLResponse)
 def compute_pnl(req: PnLRequest):
@@ -79,4 +88,3 @@ def compute_pnl(req: PnLRequest):
         break_even_unit=break_even_unit,
         rows=rows,
     )
-
